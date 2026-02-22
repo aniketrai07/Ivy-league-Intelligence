@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>{{ title if title else "Ivy League Intelligence" }}</title>
+
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Inter Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    html, body { font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial; }
+    .glass { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10); }
+    .muted { color: rgba(226,232,240,0.75); }
+  </style>
+</head>
+
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+  <header class="sticky top-0 z-50 bg-slate-950/80 backdrop-blur border-b border-white/10">
+    <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+      <a href="/" class="flex items-center gap-3">
+        <div class="h-9 w-9 rounded-xl bg-gradient-to-br from-indigo-500 to-fuchsia-500"></div>
+        <div>
+          <div class="font-bold tracking-tight">Ivy League Intelligence</div>
+          <div class="text-xs muted -mt-0.5">Fees • Admissions • Deadlines • Programs • Aid</div>
+        </div>
+      </a>
+
+      <div class="flex items-center gap-2">
+        <!-- <a href="/run-ui"
+           class="px-3 py-2 text-sm rounded-xl bg-white/10 hover:bg-white/15 border border-white/10">
+          Run Scraper Now
+        </a>
+        <a href="/api/latest"
+           class="px-3 py-2 text-sm rounded-xl bg-indigo-600/90 hover:bg-indigo-600 border border-indigo-400/20">
+          API
+        </a> -->
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 py-8">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="max-w-6xl mx-auto px-4 py-10 text-sm muted">
+    Built for a student project • Polite crawling (rate limit + retries) • Saves only when pages change
+  </footer>
+</body>
+</html>

@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="flex items-center justify-between mb-6">
+  <div>
+    <a href="/" class="text-sm muted hover:text-slate-200">← Back to Dashboard</a>
+    <h2 class="text-2xl font-semibold mt-2">{{ university }}</h2>
+    <p class="muted text-sm mt-1">Latest snapshot + recent history</p>
+  </div>
+
+  <!-- IMPORTANT: run only this university -->
+  <a href="/run-ui?uni={{ university }}"
+     class="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-sm">
+    Run Scraper Now
+  </a>
+</div>
+
+<div class="rounded-2xl glass p-4">
+  <div class="flex flex-wrap gap-2 mb-4">
+    <button class="tabBtn px-4 py-2 rounded-xl text-sm border border-white/10 bg-indigo-600/70 hover:bg-indigo-600" data-tab="fees">Fees</button>
+    <button class="tabBtn px-4 py-2 rounded-xl text-sm border border-white/10 bg-white/5 hover:bg-white/10" data-tab="admissions">Admissions</button>
+    <button class="tabBtn px-4 py-2 rounded-xl text-sm border border-white/10 bg-white/5 hover:bg-white/10" data-tab="deadlines">Deadlines</button>
+    <button class="tabBtn px-4 py-2 rounded-xl text-sm border border-white/10 bg-white/5 hover:bg-white/10" data-tab="programs">Programs</button>
+    <button class="tabBtn px-4 py-2 rounded-xl text-sm border border-white/10 bg-white/5 hover:bg-white/10" data-tab="aid">Financial Aid</button>
+    <button class="tabBtn px-4 py-2 rounded-xl text-sm border border-white/10 bg-white/5 hover:bg-white/10" data-tab="about">About</button>
+  </div>
+
+  <!-- Panels -->
+  {% for key in ["fees","admissions","deadlines","programs","aid","about"] %}
+    {% set item = snapshot[key] %}
+    <div class="panel space-y-4 {% if key != 'fees' %}hidden{% endif %}" id="panel-{{ key }}">
+      {% if item %}
+        <div class="rounded-2xl border border-white/10 bg-slate-950/40 p-5">
+          <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <span class="px-2.5 py-1 rounded-full text-xs bg-white/10 border border-white/10 text-slate-200">{{ key }}</span>
+              <span class="text-xs muted">Extracted: {{ item.extracted_at }}</span>
+            </div>
+            <a href="{{ item.url }}" target="_blank"
+              class="text-sm text-slate-300 hover:text-white underline underline-offset-4">
+              Open official page ↗
+            </a>
+          </div>
+
+          {% if key == "fees" %}
+            <div class="mt-4 grid md:grid-cols-2 gap-3">
+              {% set s = item.data.summary %}
+              {% for label in ["tuition","fees","housing","food","books","travel","personal"] %}
+                <div class="rounded-xl border border-white/10 bg-white/5 p-4">
+                  <div class="text-xs muted uppercase tracking-wide">{{ label }}</div>
+                  <div class="text-lg font-semibold mt-1">{{ s[label] if s[label] else "—" }}</div>
+                </div>
+              {% endfor %}
+            </div>
+
+            <div class="mt-4 text-sm muted">
+              Estimated total (rough): <b class="text-slate-200">{{ item.data.estimated_total_maybe if item.data.estimated_total_maybe else "—" }}</b>
+            </div>
+
+          {% elif key == "programs" %}
+            <input id="progSearch" placeholder="Search programs (e.g., Computer, Economics...)"
+              class="w-full md:w-96 mt-4 px-4 py-3 rounded-xl bg-slate-950 border border-white/10 focus:outline-none focus:ring-2 focus:ring-sky-500/60" />
+            <div class="mt-4 grid md:grid-cols-2 gap-2" id="progList">
+              {% for p in item.data.programs[:80] %}
+                <div class="progItem rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm">{{ p }}</div>
+              {% endfor %}
+            </div>
+            <div class="mt-3 text-xs muted">Showing up to 80 programs (filtered from the page).</div>
+
+          {% elif key == "deadlines" %}
+            <div class="mt-4 space-y-2">
+              {% for d in item.data.highlights[:18] %}
+                <div class="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm">{{ d }}</div>
+              {% endfor %}
+            </div>
+
+          {% elif key == "admissions" %}
+            <div class="mt-4 space-y-2">
+              {% for r in item.data.requirements[:22] %}
+                <div class="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm">{{ r }}</div>
+              {% endfor %}
+            </div>
+
+          {% else %}
+            <div class="mt-4 space-y-2">
+              {% for p in (item.data.summary if key=='aid' else item.data.overview) %}
+                <div class="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm leading-relaxed">{{ p }}</div>
+              {% endfor %}
+            </div>
+          {% endif %}
+
+          <div class="mt-4 text-xs muted">{{ item.data.note }}</div>
+        </div>
+      {% else %}
+        <div class="rounded-2xl border border-white/10 bg-slate-950/40 p-5">
+          <div class="text-sm muted">No data yet. Click “Run Scraper Now”.</div>
+        </div>
+      {% endif %}
+    </div>
+  {% endfor %}
+</div>
+
+<!-- History -->
+<div class="mt-8">
+  <h3 class="text-lg font-semibold">Recent History</h3>
+  <p class="muted text-sm mt-1">Last 25 stored snapshots (any module).</p>
+
+  <div class="mt-4 space-y-3">
+    {% for h in history %}
+      <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
+        <div class="flex items-center justify-between gap-3">
+          <div class="flex items-center gap-2">
+            <span class="px-2.5 py-1 rounded-full text-xs bg-white/10 border border-white/10">{{ h.page_type }}</span>
+            <span class="text-xs muted">{{ h.extracted_at }}</span>
+          </div>
+          <a href="{{ h.url }}" target="_blank" class="text-sm text-slate-300 hover:text-white underline underline-offset-4">Open ↗</a>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+
+<script>
+  const tabs = document.querySelectorAll(".tabBtn");
+  const panels = document.querySelectorAll(".panel");
+
+  function setTab(key) {
+    panels.forEach(p => p.classList.add("hidden"));
+    document.getElementById("panel-" + key).classList.remove("hidden");
+
+    tabs.forEach(t => {
+      if (t.dataset.tab === key) {
+        t.className = "tabBtn px-4 py-2 rounded-xl text-sm border border-white/10 bg-indigo-600/70 hover:bg-indigo-600";
+      } else {
+        t.className = "tabBtn px-4 py-2 rounded-xl text-sm border border-white/10 bg-white/5 hover:bg-white/10";
+      }
+    });
+  }
+
+  tabs.forEach(t => t.addEventListener("click", () => setTab(t.dataset.tab)));
+
+  document.addEventListener("input", (e) => {
+    if (e.target && e.target.id === "progSearch") {
+      const q = (e.target.value || "").toLowerCase().trim();
+      document.querySelectorAll(".progItem").forEach(item => {
+        const txt = item.textContent.toLowerCase();
+        item.style.display = (!q || txt.includes(q)) ? "" : "none";
+      });
+    }
+  });
+</script>
+
+{% endblock %}

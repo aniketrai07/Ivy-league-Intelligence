@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="flex flex-col gap-6">
+
+  <div class="rounded-2xl glass p-6">
+    <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+      <div>
+        <h1 class="text-2xl font-semibold tracking-tight">Dashboard</h1>
+        <p class="muted text-sm mt-1">
+          All 8 Ivy League colleges. Auto-scrape every <b>{{ schedule_minutes }}</b> minutes. Change-detection prevents duplicates.
+        </p>
+      </div>
+
+      <div class="flex gap-3">
+        <div class="px-4 py-2 rounded-xl glass">
+          <div class="text-xs muted">Sources</div>
+          <div class="text-lg font-semibold">{{ source_count }}</div>
+        </div>
+        <div class="px-4 py-2 rounded-xl glass">
+          <div class="text-xs muted">Saved Records</div>
+          <div class="text-lg font-semibold">{{ record_count }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-5 flex flex-col md:flex-row gap-3">
+      <input id="searchBox" type="text" placeholder="Search (Harvard, Yale, Princeton...)"
+             class="w-full md:w-96 px-4 py-3 rounded-xl bg-slate-950 border border-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/60" />
+
+      <select id="typeFilter"
+              class="w-full md:w-56 px-4 py-3 rounded-xl bg-slate-950 border border-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/60">
+        <option value="all">All modules</option>
+        <option value="fees">Fees</option>
+        <option value="admissions">Admissions</option>
+        <option value="deadlines">Deadlines</option>
+        <option value="programs">Programs</option>
+        <option value="aid">Financial Aid</option>
+        <option value="about">About</option>
+      </select>
+
+      <div class="text-sm muted flex items-center">
+        Tip: Click a university → tabs show latest snapshot.
+      </div>
+    </div>
+  </div>
+
+  <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4" id="uniGrid">
+    {% for uni in universities %}
+      {% set m = meta[uni] %}
+      <a href="/university/{{ uni }}"
+         data-uni="{{ uni | lower }}"
+         class="uniCard group rounded-2xl border border-white/10 bg-gradient-to-b from-white/6 to-white/3 p-5 hover:border-white/20 hover:from-white/10 transition">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <div class="text-lg font-semibold">{{ uni }}</div>
+            <div class="text-xs muted mt-1">
+              Last updated: {{ m.last_updated if m.last_updated else "Not scraped yet" }}
+            </div>
+          </div>
+
+          <div class="h-10 w-10 rounded-xl bg-white/5 border border-white/10 grid place-items-center group-hover:bg-white/10">
+            <span class="text-slate-200">↗</span>
+          </div>
+        </div>
+
+        <div class="mt-4 flex flex-wrap gap-2">
+          <span class="badge badge-fees px-2.5 py-1 rounded-full text-xs bg-indigo-500/15 border border-indigo-400/20 text-indigo-200">Fees ({{ m.counts.fees }})</span>
+          <span class="badge badge-adm px-2.5 py-1 rounded-full text-xs bg-fuchsia-500/15 border border-fuchsia-400/20 text-fuchsia-200">Admissions ({{ m.counts.admissions }})</span>
+          <span class="badge badge-dead px-2.5 py-1 rounded-full text-xs bg-emerald-500/15 border border-emerald-400/20 text-emerald-200">Deadlines ({{ m.counts.deadlines }})</span>
+          <span class="badge badge-prog px-2.5 py-1 rounded-full text-xs bg-sky-500/15 border border-sky-400/20 text-sky-200">Programs ({{ m.counts.programs }})</span>
+          <span class="badge badge-aid px-2.5 py-1 rounded-full text-xs bg-amber-500/15 border border-amber-400/20 text-amber-200">Aid ({{ m.counts.aid }})</span>
+          <span class="badge badge-about px-2.5 py-1 rounded-full text-xs bg-slate-500/15 border border-slate-400/20 text-slate-200">About ({{ m.counts.about }})</span>
+        </div>
+      </a>
+    {% endfor %}
+  </div>
+</div>
+
+<script>
+  const searchBox = document.getElementById("searchBox");
+  const typeFilter = document.getElementById("typeFilter");
+  const cards = Array.from(document.getElementsByClassName("uniCard"));
+
+  function setBadgeOpacity(card, selectedType) {
+    const map = {
+      fees: "badge-fees",
+      admissions: "badge-adm",
+      deadlines: "badge-dead",
+      programs: "badge-prog",
+      aid: "badge-aid",
+      about: "badge-about"
+    };
+
+    Object.values(map).forEach(cls => {
+      const el = card.querySelector("." + cls);
+      if (!el) return;
+      if (selectedType === "all") {
+        el.classList.remove("opacity-40");
+      } else {
+        el.classList.toggle("opacity-40", cls !== map[selectedType]);
+      }
+    });
+  }
+
+  function applyFilters() {
+    const q = (searchBox.value || "").toLowerCase().trim();
+    const t = typeFilter.value;
+
+    cards.forEach(card => {
+      const name = card.dataset.uni || "";
+      const matchesSearch = !q || name.includes(q);
+      card.style.display = matchesSearch ? "" : "none";
+      setBadgeOpacity(card, t);
+    });
+  }
+
+  searchBox.addEventListener("input", applyFilters);
+  typeFilter.addEventListener("change", applyFilters);
+  applyFilters();
+</script>
+
+{% endblock %}
