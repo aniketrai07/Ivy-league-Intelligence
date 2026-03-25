@@ -1,8 +1,10 @@
 import json
+import asyncio
 from datetime import datetime
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.templating import Jinja2Templates
 from sqlalchemy.exc import IntegrityError
 
 from app.db import ExtractedData, get_session_maker
@@ -10,45 +12,58 @@ from app.scheduler import run_pipeline
 from app.settings import config
 from app.sources import SOURCES
 from app.scraper import scrape_one
-import asyncio
-
-from fastapi.templating import Jinja2Templates
-
-
 
 app = FastAPI(title="Ivy League Intelligence Web App")
 templates = Jinja2Templates(directory="app/templates")
 
 SessionLocal = get_session_maker(config.DB_URL)
 
-# If you face double-run during reload, you can comment scheduler during testing.
-# scheduler = start_scheduler(SessionLocal, config.SCHEDULE_MINUTES)
+LAST_RUN = {
+    "time": None,
+    "saved_new_records": 0,
+    "errors": 0,
+    "skipped_duplicates": 0
+}
 
-LAST_RUN = {"time": None, "saved_new_records": 0, "errors": 0, "skipped_duplicates": 0}
 
 @app.get("/ping")
 def ping():
     return {"ok": True}
 
+
 def _latest_per_uni(db):
-    
     universities = sorted({s["university"] for s in SOURCES})
     meta = {}
+
     for uni in universities:
-        latest = (db.query(ExtractedData)
-                  .filter(ExtractedData.university == uni)
-                  .order_by(ExtractedData.extracted_at.desc())
-                  .first())
-        last_updated = latest.extracted_at.isoformat(sep=" ", timespec="seconds") if latest else None
+        latest = (
+            db.query(ExtractedData)
+            .filter(ExtractedData.university == uni)
+            .order_by(ExtractedData.extracted_at.desc())
+            .first()
+        )
+
+        last_updated = (
+            latest.extracted_at.isoformat(sep=" ", timespec="seconds")
+            if latest else None
+        )
 
         counts = {}
         for t in ["fees", "admissions", "deadlines", "programs", "aid", "about"]:
-            counts[t] = db.query(ExtractedData).filter(
-                ExtractedData.university == uni,
-                ExtractedData.page_type == t
-            ).count()
+            counts[t] = (
+                db.query(ExtractedData)
+                .filter(
+                    ExtractedData.university == uni,
+                    ExtractedData.page_type == t
+                )
+                .count()
+            )
 
-        meta[uni] = {"last_updated": last_updated, "counts": counts}
+        meta[uni] = {
+            "last_updated": last_updated,
+            "counts": counts
+        }
+
     return meta
 
 
@@ -63,8 +78,9 @@ def dashboard(request: Request):
         db.close()
 
     return templates.TemplateResponse(
-        "dashboard.html",
-        {
+        request=request,
+        name="dashboard.html",
+        context={
             "request": request,
             "title": "Dashboard • Ivy League Intelligence",
             "universities": universities,
@@ -81,11 +97,13 @@ def dashboard(request: Request):
 def university_page(name: str, request: Request):
     db = SessionLocal()
     try:
-        rows = (db.query(ExtractedData)
-                .filter(ExtractedData.university == name)
-                .order_by(ExtractedData.extracted_at.desc())
-                .limit(80)
-                .all())
+        rows = (
+            db.query(ExtractedData)
+            .filter(ExtractedData.university == name)
+            .order_by(ExtractedData.extracted_at.desc())
+            .limit(80)
+            .all()
+        )
 
         latest_by_type = {}
         history = []
@@ -117,8 +135,9 @@ def university_page(name: str, request: Request):
         }
 
         return templates.TemplateResponse(
-            "university.html",
-            {
+            request=request,
+            name="university.html",
+            context={
                 "request": request,
                 "title": f"{name} • Ivy League Intelligence",
                 "university": name,
@@ -132,10 +151,14 @@ def university_page(name: str, request: Request):
 
 @app.get("/run-ui", response_class=HTMLResponse)
 def run_ui(request: Request):
-    return templates.TemplateResponse("run.html", {
-        "request": request,
-        "title": "Run Scraper • Ivy League Intelligence"
-    })
+    return templates.TemplateResponse(
+        request=request,
+        name="run.html",
+        context={
+            "request": request,
+            "title": "Run Scraper • Ivy League Intelligence"
+        }
+    )
 
 
 @app.get("/run-json")
@@ -145,7 +168,12 @@ def run_json():
     LAST_RUN["saved_new_records"] = result.get("saved_new_records", 0)
     LAST_RUN["errors"] = result.get("errors", 0)
     LAST_RUN["skipped_duplicates"] = result.get("skipped_duplicates", 0)
-    return JSONResponse({"message": "Scrape run completed", "result": result, "time": LAST_RUN["time"]})
+
+    return JSONResponse({
+        "message": "Scrape run completed",
+        "result": result,
+        "time": LAST_RUN["time"]
+    })
 
 
 @app.get("/run-university/{name}")
@@ -158,7 +186,11 @@ def run_university(name: str):
             try:
                 out.append(await scrape_one(src))
             except Exception as e:
-                out.append({"error": str(e), "url": src["url"], "page_type": src["page_type"]})
+                out.append({
+                    "error": str(e),
+                    "url": src["url"],
+                    "page_type": src["page_type"]
+                })
         return out
 
     results = asyncio.run(_run())
@@ -183,6 +215,7 @@ def run_university(name: str):
                 data_json=r["data_json"]
             )
             db.add(row)
+
             try:
                 db.commit()
                 saved += 1
@@ -190,7 +223,12 @@ def run_university(name: str):
                 db.rollback()
                 skipped += 1
 
-        return {"university": name, "saved_new_records": saved, "errors": errors, "skipped_duplicates": skipped}
+        return {
+            "university": name,
+            "saved_new_records": saved,
+            "errors": errors,
+            "skipped_duplicates": skipped
+        }
     finally:
         db.close()
 
@@ -199,10 +237,13 @@ def run_university(name: str):
 def api_latest(limit: int = 80):
     db = SessionLocal()
     try:
-        rows = (db.query(ExtractedData)
-                .order_by(ExtractedData.extracted_at.desc())
-                .limit(limit)
-                .all())
+        rows = (
+            db.query(ExtractedData)
+            .order_by(ExtractedData.extracted_at.desc())
+            .limit(limit)
+            .all()
+        )
+
         return [
             {
                 "university": r.university,
